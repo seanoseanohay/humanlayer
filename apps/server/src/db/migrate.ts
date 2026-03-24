@@ -74,4 +74,10 @@ export async function migrateDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_sessions_status
     ON sessions (status)
   `);
+
+  // Unique constraint prevents duplicate events per session
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_events_unique_seq
+    ON session_events (session_id, sequence)
+  `);
 }

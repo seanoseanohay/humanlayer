@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { eq, gt } from "drizzle-orm";
+import { eq, gt, and } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { eventBus } from "../events/bus.js";
 import { sessionIdParamSchema } from "../validation.js";
@@ -47,8 +47,10 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
       .from(schema.sessionEvents)
       .where(
         cursor > 0
-          ? eq(schema.sessionEvents.sessionId, sessionId) &&
+          ? and(
+              eq(schema.sessionEvents.sessionId, sessionId),
               gt(schema.sessionEvents.sequence, cursor)
+            )
           : eq(schema.sessionEvents.sessionId, sessionId)
       )
       .orderBy(schema.sessionEvents.sequence);
