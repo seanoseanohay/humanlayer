@@ -30,12 +30,11 @@ if (existsSync(uiDistPath)) {
   await app.register(fastifyStatic, {
     root: uiDistPath,
     prefix: "/",
-    wildcard: false,
   });
 
-  // SPA fallback — serve index.html for non-API routes
+  // SPA fallback — serve index.html for non-API, non-asset routes
   app.setNotFoundHandler((_request, reply) => {
-    reply.sendFile("index.html");
+    return reply.sendFile("index.html");
   });
 
   app.log.info(`Serving UI from ${uiDistPath}`);
