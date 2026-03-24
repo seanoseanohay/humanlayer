@@ -16,6 +16,9 @@ const stopRequested = new Set<string>();
 /** Track running sessions to prevent double-assignment */
 const runningSessions = new Set<string>();
 
+/** Queue of pending user messages per session */
+const pendingMessages = new Map<string, string[]>();
+
 const wsClient = new AgentWSClient({
   serverUrl,
   secret: agentSecret,
@@ -33,11 +36,17 @@ const wsClient = new AgentWSClient({
     console.log(`[agent] starting session ${sessionId}`);
 
     try {
+      pendingMessages.set(sessionId, []);
       await runAgentLoop({
         sessionId,
         prompt,
         wsClient,
         shouldStop: () => stopRequested.has(sessionId),
+        getPendingMessages: () => {
+          const msgs = pendingMessages.get(sessionId) ?? [];
+          pendingMessages.set(sessionId, []);
+          return msgs;
+        },
       });
     } catch (err) {
       console.error(`[agent] session ${sessionId} error:`, err);
@@ -48,11 +57,18 @@ const wsClient = new AgentWSClient({
     } finally {
       runningSessions.delete(sessionId);
       stopRequested.delete(sessionId);
+      pendingMessages.delete(sessionId);
     }
   },
   onStopSession: (sessionId) => {
     console.log(`[agent] stop requested for session ${sessionId}`);
     stopRequested.add(sessionId);
+  },
+  onUserMessage: (sessionId, content) => {
+    console.log(`[agent] user message for session ${sessionId}: ${content.slice(0, 50)}`);
+    const queue = pendingMessages.get(sessionId) ?? [];
+    queue.push(content);
+    pendingMessages.set(sessionId, queue);
   },
 });
 

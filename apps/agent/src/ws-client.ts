@@ -10,6 +10,7 @@ export interface WSClientOptions {
   agentName: string;
   onAssignSession: (sessionId: string, prompt: string) => void;
   onStopSession: (sessionId: string) => void;
+  onUserMessage: (sessionId: string, content: string) => void;
   onRegistered: (agentId: string) => void;
 }
 
@@ -60,6 +61,11 @@ export class AgentWSClient {
         case "server:stop_session":
           console.log(`[ws] stop requested for session ${msg.payload.sessionId}`);
           this.opts.onStopSession(msg.payload.sessionId);
+          break;
+
+        case "server:user_message":
+          console.log(`[ws] user message for session ${msg.payload.sessionId}`);
+          this.opts.onUserMessage(msg.payload.sessionId, msg.payload.content);
           break;
 
         case "server:error":
