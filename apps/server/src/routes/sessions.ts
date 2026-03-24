@@ -180,10 +180,20 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: "Session not found" });
     }
 
-    if (!["assigned", "running"].includes(session.status)) {
+    // Only reject messages to stopped/failed sessions
+    if (["stopped", "failed"].includes(session.status)) {
       return reply.status(409).send({
         error: `Cannot send message to session in state: ${session.status}`,
       });
+    }
+
+    // If session was completed, reactivate it for the follow-up
+    const needsReactivation = session.status === "completed";
+    if (needsReactivation) {
+      await db
+        .update(schema.sessions)
+        .set({ status: "running", updatedAt: new Date() })
+        .where(eq(schema.sessions.id, sessionId));
     }
 
     // Persist user_message event

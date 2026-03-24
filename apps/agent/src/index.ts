@@ -19,6 +19,9 @@ const runningSessions = new Set<string>();
 /** Queue of pending user messages per session */
 const pendingMessages = new Map<string, string[]>();
 
+/** Track conversation history per session for follow-ups */
+const sessionConversations = new Map<string, { prompt: string }>();
+
 const wsClient = new AgentWSClient({
   serverUrl,
   secret: agentSecret,
@@ -33,6 +36,7 @@ const wsClient = new AgentWSClient({
     }
 
     runningSessions.add(sessionId);
+    sessionConversations.set(sessionId, { prompt });
     console.log(`[agent] starting session ${sessionId}`);
 
     try {
@@ -64,11 +68,42 @@ const wsClient = new AgentWSClient({
     console.log(`[agent] stop requested for session ${sessionId}`);
     stopRequested.add(sessionId);
   },
-  onUserMessage: (sessionId, content) => {
+  onUserMessage: async (sessionId, content) => {
     console.log(`[agent] user message for session ${sessionId}: ${content.slice(0, 50)}`);
     const queue = pendingMessages.get(sessionId) ?? [];
     queue.push(content);
     pendingMessages.set(sessionId, queue);
+
+    // If session isn't currently running, restart the loop as a follow-up
+    if (!runningSessions.has(sessionId)) {
+      const conv = sessionConversations.get(sessionId);
+      if (conv) {
+        console.log(`[agent] restarting session ${sessionId} for follow-up`);
+        runningSessions.add(sessionId);
+        try {
+          await runAgentLoop({
+            sessionId,
+            prompt: content,
+            wsClient,
+            shouldStop: () => stopRequested.has(sessionId),
+            getPendingMessages: () => {
+              const msgs = pendingMessages.get(sessionId) ?? [];
+              pendingMessages.set(sessionId, []);
+              return msgs;
+            },
+          });
+        } catch (err) {
+          console.error(`[agent] follow-up session ${sessionId} error:`, err);
+          wsClient.sendEvent(sessionId, "error", {
+            message: err instanceof Error ? err.message : String(err),
+          });
+          wsClient.sendSessionUpdate(sessionId, "failed");
+        } finally {
+          runningSessions.delete(sessionId);
+          stopRequested.delete(sessionId);
+        }
+      }
+    }
   },
 });
 

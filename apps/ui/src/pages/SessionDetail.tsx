@@ -150,7 +150,7 @@ export function SessionDetail() {
         </div>
       </div>
 
-      {!isTerminal && (
+      {session.status !== "stopped" && session.status !== "failed" && (
         <form onSubmit={handleSendMessage} className="message-form">
           <input
             type="text"
