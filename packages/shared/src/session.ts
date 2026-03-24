@@ -34,3 +34,7 @@ export interface CreateSessionRequest {
 export interface CreateSessionResponse {
   session: Session;
 }
+
+export interface SendMessageRequest {
+  content: string;
+}

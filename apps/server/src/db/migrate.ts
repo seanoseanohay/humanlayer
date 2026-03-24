@@ -25,7 +25,7 @@ export async function migrateDatabase(): Promise<void> {
         'assistant_message_delta', 'assistant_message_completed',
         'thinking_delta', 'tool_call_started', 'tool_call_output',
         'tool_call_completed', 'status_changed', 'error',
-        'session_stopped', 'session_completed'
+        'session_stopped', 'session_completed', 'user_message'
       );
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$
@@ -79,5 +79,13 @@ export async function migrateDatabase(): Promise<void> {
   await db.execute(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_session_events_unique_seq
     ON session_events (session_id, sequence)
+  `);
+
+  // Add user_message to event_type enum if it doesn't exist
+  await db.execute(sql`
+    DO $$ BEGIN
+      ALTER TYPE event_type ADD VALUE IF NOT EXISTS 'user_message';
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$
   `);
 }

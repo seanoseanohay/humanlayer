@@ -79,6 +79,14 @@ export interface ServerErrorMessage {
   };
 }
 
+export interface ServerUserMessageMessage {
+  type: "server:user_message";
+  payload: {
+    sessionId: string;
+    content: string;
+  };
+}
+
 /** Union of all WebSocket message types */
 export type AgentToServerMessage =
   | AgentRegisterMessage
@@ -90,6 +98,7 @@ export type ServerToAgentMessage =
   | ServerRegisteredMessage
   | ServerAssignSessionMessage
   | ServerStopSessionMessage
-  | ServerErrorMessage;
+  | ServerErrorMessage
+  | ServerUserMessageMessage;
 
 export type WSMessage = AgentToServerMessage | ServerToAgentMessage;

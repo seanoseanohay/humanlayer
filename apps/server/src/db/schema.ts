@@ -33,6 +33,7 @@ export const eventTypeEnum = pgEnum("event_type", [
   "error",
   "session_stopped",
   "session_completed",
+  "user_message",
 ]);
 
 export const sessionEvents = pgTable("session_events", {

@@ -13,6 +13,7 @@ export const EVENT_TYPES = [
   "error",
   "session_stopped",
   "session_completed",
+  "user_message",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
