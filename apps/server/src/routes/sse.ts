@@ -30,12 +30,15 @@ export async function sseRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: "Session not found" });
     }
 
-    // Set SSE headers
+    // Set SSE headers (includes CORS since we bypass Fastify's response handling)
+    const origin = request.headers.origin ?? "*";
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Credentials": "true",
     });
 
     // Replay persisted events from cursor
