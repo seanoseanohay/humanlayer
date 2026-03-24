@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listSessions, createSession, type Session } from "../api";
+import { timeAgo } from "../utils/time";
 
 export function SessionList() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -88,7 +89,7 @@ export function SessionList() {
                   {session.status}
                 </span>
                 <span className="session-time">
-                  {new Date(session.createdAt).toLocaleString()}
+                  {timeAgo(session.createdAt)}
                 </span>
               </div>
               <p className="session-prompt">{session.prompt}</p>
