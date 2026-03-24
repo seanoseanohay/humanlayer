@@ -10,7 +10,10 @@ COPY apps/ui/ apps/ui/
 # Install dependencies
 RUN npm ci --workspace=apps/ui --include-workspace-root
 
-# Build the UI
+# Build the UI — API URL is set for the Docker environment
+# The browser connects to the server via host-mapped port
+ARG VITE_API_URL=http://localhost:3000
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build -w apps/ui
 
 # Serve with a lightweight static server
