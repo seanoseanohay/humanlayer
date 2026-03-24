@@ -22,34 +22,37 @@ export function SessionDetail() {
       );
   }, [id]);
 
-  // Update session status from events (status_changed, terminal events)
+  // Derive the latest status from events without causing render loops
   useEffect(() => {
-    if (!session) return;
+    if (events.length === 0) return;
 
-    // Check status_changed events
-    const statusEvent = [...events]
-      .reverse()
-      .find((e) => e.type === "status_changed");
-    if (statusEvent) {
-      const newStatus = (statusEvent.payload as { status?: string }).status;
-      if (newStatus && newStatus !== session.status) {
-        setSession((prev) => prev ? { ...prev, status: newStatus } : prev);
-        if (stopping && ["stopped", "completed", "failed"].includes(newStatus)) {
-          setStopping(false);
-        }
+    // Find the latest status from events
+    let latestStatus: string | null = null;
+
+    // Check status_changed events (most authoritative)
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e.type === "status_changed") {
+        latestStatus = (e.payload as { status?: string }).status ?? null;
+        break;
       }
     }
 
-    // Also handle terminal events directly
+    // Also check terminal events
     const lastEvent = events[events.length - 1];
-    if (lastEvent?.type === "session_completed" && session.status !== "completed") {
-      setSession((prev) => prev ? { ...prev, status: "completed" } : prev);
+    if (lastEvent?.type === "session_completed") latestStatus = "completed";
+    if (lastEvent?.type === "session_stopped") latestStatus = "stopped";
+
+    if (latestStatus) {
+      setSession((prev) => {
+        if (!prev || prev.status === latestStatus) return prev;
+        return { ...prev, status: latestStatus };
+      });
+      if (["stopped", "completed", "failed"].includes(latestStatus)) {
+        setStopping(false);
+      }
     }
-    if (lastEvent?.type === "session_stopped" && session.status !== "stopped") {
-      setSession((prev) => prev ? { ...prev, status: "stopped" } : prev);
-      setStopping(false);
-    }
-  }, [events, session, stopping]);
+  }, [events]);
 
   // Auto-scroll to bottom
   useEffect(() => {
