@@ -195,7 +195,7 @@ function EventItem({
     case "tool_call_output": {
       const output = String(payload["output"] ?? "");
       const err = payload["error"] ? `Error: ${payload["error"]}` : "";
-      content = err || output.slice(0, 500);
+      content = err || output;
       break;
     }
     case "tool_call_completed":
@@ -223,6 +223,10 @@ function EventItem({
       content = JSON.stringify(payload);
   }
 
+  const isLong = content.length > 300;
+  const [expanded, setExpanded] = useState(false);
+  const displayContent = isLong && !expanded ? content.slice(0, 300) + "..." : content;
+
   return (
     <div className={`event-item event-${event.type}`}>
       <div className="event-meta">
@@ -232,7 +236,15 @@ function EventItem({
           {new Date(event.timestamp).toLocaleTimeString()}
         </span>
       </div>
-      <pre className="event-content">{content}</pre>
+      <pre className="event-content">{displayContent}</pre>
+      {isLong && (
+        <button
+          className="expand-toggle"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Collapse" : "Expand"}
+        </button>
+      )}
     </div>
   );
 }

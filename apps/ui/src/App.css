@@ -316,6 +316,19 @@
   color: #ccc;
 }
 
+.expand-toggle {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.expand-toggle:hover {
+  text-decoration: underline;
+}
+
 .event-assistant_message_delta,
 .event-assistant_message_completed {
   background: #0a1628;
