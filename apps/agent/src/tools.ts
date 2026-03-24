@@ -174,21 +174,46 @@ export const TOOL_DEFINITIONS = [
   },
 ];
 
-/** Execute a tool by name */
+/** Max output size sent back to LLM to avoid context overflow */
+const MAX_OUTPUT_SIZE = 8000;
+
+function truncateOutput(output: string): string {
+  if (output.length <= MAX_OUTPUT_SIZE) return output;
+  return (
+    output.slice(0, MAX_OUTPUT_SIZE) +
+    `\n...[truncated ${output.length - MAX_OUTPUT_SIZE} chars]`
+  );
+}
+
+/** Execute a tool by name, with output truncation */
 export function executeTool(
   name: string,
   args: Record<string, string>
 ): ToolResult {
-  switch (name) {
-    case "read_file":
-      return readFile(args["path"] ?? "");
-    case "write_file":
-      return writeFile(args["path"] ?? "", args["content"] ?? "");
-    case "list_files":
-      return listFiles(args["path"] ?? ".");
-    case "shell_exec":
-      return shellExec(args["command"] ?? "");
-    default:
-      return { output: "", error: `Unknown tool: ${name}` };
+  let result: ToolResult;
+  try {
+    switch (name) {
+      case "read_file":
+        result = readFile(args["path"] ?? "");
+        break;
+      case "write_file":
+        result = writeFile(args["path"] ?? "", args["content"] ?? "");
+        break;
+      case "list_files":
+        result = listFiles(args["path"] ?? ".");
+        break;
+      case "shell_exec":
+        result = shellExec(args["command"] ?? "");
+        break;
+      default:
+        return { output: "", error: `Unknown tool: ${name}` };
+    }
+  } catch (err) {
+    return { output: "", error: `Tool execution error: ${err}` };
   }
+
+  return {
+    output: truncateOutput(result.output),
+    error: result.error,
+  };
 }
