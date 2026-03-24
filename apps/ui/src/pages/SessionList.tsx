@@ -6,14 +6,18 @@ export function SessionList() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     try {
       const data = await listSessions();
       setSessions(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -61,7 +65,9 @@ export function SessionList() {
       {error && <div className="error">{error}</div>}
 
       <div className="session-list">
-        {sessions.length === 0 ? (
+        {initialLoading ? (
+          <p className="empty">Loading sessions...</p>
+        ) : sessions.length === 0 ? (
           <p className="empty">No sessions yet. Create one above.</p>
         ) : (
           sessions.map((session) => (
