@@ -10,11 +10,15 @@ COPY packages/shared/ packages/shared/
 # Copy server package
 COPY apps/server/ apps/server/
 
-# Install all dependencies
-RUN npm ci --workspace=packages/shared --workspace=apps/server --include-workspace-root
+# Copy UI package (server serves UI static files)
+COPY apps/ui/ apps/ui/
 
-# Build shared first, then server
+# Install all dependencies
+RUN npm ci --workspace=packages/shared --workspace=apps/server --workspace=apps/ui --include-workspace-root
+
+# Build shared first, then UI, then server
 RUN npm run build -w packages/shared
+RUN npm run build -w apps/ui
 RUN npm run build -w apps/server
 
 EXPOSE 3000

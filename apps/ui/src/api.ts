@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+// Use empty string (relative URLs) when served from the same origin as the server
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export interface Session {
   id: string;

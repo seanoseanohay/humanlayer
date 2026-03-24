@@ -1,5 +1,9 @@
+import { existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import { migrateDatabase } from "./db/migrate.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { sseRoutes } from "./routes/sse.js";
@@ -18,6 +22,24 @@ await app.register(wsGateway);
 app.get("/health", async () => {
   return { status: "ok" };
 });
+
+// Serve UI static files if present (combined server+UI container mode)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const uiDistPath = resolve(__dirname, "../../ui/dist");
+if (existsSync(uiDistPath)) {
+  await app.register(fastifyStatic, {
+    root: uiDistPath,
+    prefix: "/",
+    wildcard: false,
+  });
+
+  // SPA fallback — serve index.html for non-API routes
+  app.setNotFoundHandler((_request, reply) => {
+    reply.sendFile("index.html");
+  });
+
+  app.log.info(`Serving UI from ${uiDistPath}`);
+}
 
 // Global error handler for unhandled route errors
 app.setErrorHandler((error, _request, reply) => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { SessionEvent } from "../api";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export function useSessionEvents(sessionId: string) {
   const [events, setEvents] = useState<SessionEvent[]>([]);
