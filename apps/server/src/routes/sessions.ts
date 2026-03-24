@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { eq, desc } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { createSessionSchema, sessionIdParamSchema } from "../validation.js";
+import { createSessionSchema, sessionIdParamSchema, sendMessageSchema } from "../validation.js";
 import type { SessionStatus } from "@humanlayer/shared";
 import { getAvailableAgent, sendToAgent } from "../ws/gateway.js";
 import { eventBus } from "../events/bus.js";
@@ -155,5 +155,71 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send({ session: updated });
+  });
+
+  // POST /sessions/:id/message — send a user message to a running session
+  app.post("/sessions/:id/message", async (request, reply) => {
+    const paramsParsed = sessionIdParamSchema.safeParse(request.params);
+    if (!paramsParsed.success) {
+      return reply.status(400).send({ error: paramsParsed.error.flatten() });
+    }
+
+    const bodyParsed = sendMessageSchema.safeParse(request.body);
+    if (!bodyParsed.success) {
+      return reply.status(400).send({ error: bodyParsed.error.flatten() });
+    }
+
+    const sessionId = paramsParsed.data.id;
+
+    const [session] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionId));
+
+    if (!session) {
+      return reply.status(404).send({ error: "Session not found" });
+    }
+
+    if (!["assigned", "running"].includes(session.status)) {
+      return reply.status(409).send({
+        error: `Cannot send message to session in state: ${session.status}`,
+      });
+    }
+
+    // Persist user_message event
+    const existingCount = await db
+      .select({ sequence: schema.sessionEvents.sequence })
+      .from(schema.sessionEvents)
+      .where(eq(schema.sessionEvents.sessionId, sessionId))
+      .then((rows) => rows.length);
+
+    const [event] = await db
+      .insert(schema.sessionEvents)
+      .values({
+        sessionId,
+        sequence: existingCount + 1,
+        type: "user_message",
+        payload: { content: bodyParsed.data.content },
+      })
+      .returning();
+
+    // Fan out to SSE
+    eventBus.emitSessionEvent(sessionId, {
+      id: event.id,
+      sequence: event.sequence,
+      timestamp: event.timestamp.toISOString(),
+      type: event.type,
+      payload: event.payload as Record<string, unknown>,
+    });
+
+    // Forward to agent via WS
+    if (session.agentId) {
+      sendToAgent(session.agentId, {
+        type: "server:user_message",
+        payload: { sessionId, content: bodyParsed.data.content },
+      });
+    }
+
+    return reply.status(201).send({ event });
   });
 }
