@@ -79,39 +79,28 @@ The assignment forbids unnecessary paid services and should run with `docker com
 ### Why a restricted shell?
 The goal is a real coding agent without sacrificing reproducibility. Restricting the workspace and command set makes the Dockerized review path deterministic and easier to evaluate.
 
-## Planned Stack
-
-This repository is intended to use a stack similar to:
+## Stack
 
 - **Frontend:** React + Vite + TypeScript
-- **Server:** Node.js + Fastify or Express + TypeScript
+- **Server:** Node.js + Fastify + TypeScript
 - **Realtime:** SSE for UI, WebSocket for agent transport
 - **Database:** Postgres
-- **ORM / SQL layer:** Drizzle or Prisma
+- **ORM / SQL layer:** Drizzle ORM
 - **Validation:** Zod
-- **Agent loop:** custom TypeScript implementation using provider SDKs only
+- **Agent loop:** custom TypeScript implementation using OpenAI SDK for LLM calls
 - **Containers:** Docker + Docker Compose
-
-Final library choices should remain consistent with the docs in `docs/`.
 
 ## Core Features
 
-### v1 features
-- create a coding session
-- persist and list sessions
-- dispatch queued work to a connected agent
-- stream assistant messages, tool calls, thinking deltas, and status events live
-- stop a running session
-- recover UI state from persisted events after refresh/reconnect
-- run everything with Docker Compose
-
-### Explicitly out of scope for v1
-- production multi-tenant auth
-- billing
-- advanced per-session sandbox virtualization
-- multi-agent scheduling
-- cloud deployment automation
-- collaborative multi-user editing
+- Create coding sessions from the UI
+- Persist and list sessions with status tracking
+- Dispatch queued work to a connected agent
+- Stream assistant messages, tool calls, thinking deltas, and status events live
+- Stop a running session with cooperative agent halt
+- Send follow-up messages to continue iterative conversation
+- Recover UI state from persisted events after refresh/reconnect
+- Collapsible long event content
+- Run everything with `docker compose up`
 
 ## Session Lifecycle
 
@@ -185,61 +174,53 @@ The server is the source of truth for ordering and replay.
 - optional LLM API key for the provider you choose
 
 ### Environment
-Create a `.env` file at the repo root.
+Copy `.env.example` to `.env` and set your LLM API key:
 
-Minimum expected variables:
-
-```env
-POSTGRES_USER=app
-POSTGRES_PASSWORD=app
-POSTGRES_DB=humanlayer
-DATABASE_URL=postgres://app:app@db:5432/humanlayer
-
-APP_USER_EMAIL=reviewer@example.com
-APP_USER_PASSWORD=reviewer
-
-AGENT_SHARED_SECRET=replace_me
-
-LLM_PROVIDER=openai
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-GOOGLE_API_KEY=
+```bash
+cp .env.example .env
+# Edit .env and set OPENAI_API_KEY (or ANTHROPIC_API_KEY)
 ```
 
-Only the provider variables needed by the chosen implementation must be set.
+The default provider is `openai` with model `gpt-4o-mini`. Set `LLM_PROVIDER=anthropic` to use Anthropic instead.
 
 ### Start the stack
 ```bash
 docker compose up --build
 ```
 
-Expected containers:
-- database
-- server
-- ui
-- agent-runner
+This starts 3 containers:
+- **db** — Postgres database
+- **server** — API server + UI (serves both on one port)
+- **agent-runner** — headless coding agent (no exposed ports)
+
+### Open the UI
+Navigate to **http://localhost:3000** (or `SERVER_PORT` if customized).
+
+If port 3000 is in use, set a custom port:
+```bash
+SERVER_PORT=3002 docker compose up --build
+```
 
 ### Reviewer flow
-1. Create `.env`
+1. Copy `.env.example` to `.env` and add your LLM API key
 2. Run `docker compose up --build`
-3. Open the UI in the browser
-4. Sign in with the seeded local credentials
-5. Create a session
-6. Observe live event streaming
-7. Stop the session and confirm cooperative halt
+3. Open http://localhost:3000 in the browser
+4. Create a session (e.g. "Write a hello.txt file with hello world")
+5. Click the session to see live event streaming
+6. Send a follow-up message after completion
+7. Create another session and click Stop to test cooperative halt
 
-## Docker Compose Expectations
+## Docker Compose
 
-The compose project must include:
-- a DB container
-- a server container
-- a UI container or a combined server/UI container
-- a separate agent container
+The compose project includes:
+- a **DB container** (Postgres)
+- a **server container** that serves both the API and UI
+- a separate **agent container** that connects outbound only
 
 Rules:
-- server and UI expose the needed ports
-- the agent container does **not** expose ports
-- the agent connects outbound to the server
+- server exposes port 3000 (configurable via `SERVER_PORT`)
+- the agent container does **not** expose any ports
+- the agent connects outbound to the server via WebSocket
 - no extra post-start manual setup is required
 
 ## API / Transport Outline
