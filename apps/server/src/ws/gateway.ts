@@ -50,7 +50,21 @@ export async function wsGateway(app: FastifyInstance): Promise<void> {
     const ws = socket as unknown as WebSocket;
     let agentId: string | null = null;
 
-    ws.on("message", async (raw) => {
+    ws.on("message", (raw) => {
+      handleMessage(ws, raw, app).catch((err) => {
+        app.log.error(`WS message handler error: ${err}`);
+        sendWs(ws, {
+          type: "server:error",
+          payload: { message: "Internal server error" },
+        });
+      });
+    });
+
+    async function handleMessage(
+      ws: WebSocket,
+      raw: unknown,
+      app: FastifyInstance
+    ): Promise<void> {
       let msg: AgentToServerMessage;
       try {
         msg = JSON.parse(String(raw)) as AgentToServerMessage;
@@ -186,7 +200,7 @@ export async function wsGateway(app: FastifyInstance): Promise<void> {
           break;
         }
       }
-    });
+    }
 
     ws.on("close", async () => {
       if (agentId) {

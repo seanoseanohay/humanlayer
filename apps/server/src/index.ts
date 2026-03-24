@@ -19,6 +19,28 @@ app.get("/health", async () => {
   return { status: "ok" };
 });
 
+// Global error handler for unhandled route errors
+app.setErrorHandler((error, _request, reply) => {
+  app.log.error(error);
+  const statusCode =
+    typeof error === "object" && error !== null && "statusCode" in error
+      ? (error as { statusCode: number }).statusCode
+      : 500;
+  const message =
+    error instanceof Error ? error.message : "Internal server error";
+  reply.status(statusCode).send({ error: message });
+});
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  app.log.info(`Received ${signal}, shutting down gracefully...`);
+  await app.close();
+  process.exit(0);
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
 try {
   app.log.info("Running database migrations...");
   await migrateDatabase();
