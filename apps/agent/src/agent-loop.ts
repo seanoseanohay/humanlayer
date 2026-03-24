@@ -18,6 +18,7 @@ export interface AgentLoopOptions {
   prompt: string;
   wsClient: AgentWSClient;
   shouldStop: () => boolean;
+  getPendingMessages: () => string[];
 }
 
 function emitStop(wsClient: AgentWSClient, sessionId: string, reason: string): void {
@@ -27,7 +28,7 @@ function emitStop(wsClient: AgentWSClient, sessionId: string, reason: string): v
 }
 
 export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
-  const { sessionId, prompt, wsClient, shouldStop } = opts;
+  const { sessionId, prompt, wsClient, shouldStop, getPendingMessages } = opts;
 
   const provider = process.env["LLM_PROVIDER"] ?? "openai";
   let client: OpenAI;
@@ -193,6 +194,27 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
 
     // No tool calls — LLM is done
     if (choice.finish_reason === "stop") {
+      // Check for pending user messages before completing
+      const pending = getPendingMessages();
+      if (pending.length > 0) {
+        console.log(`[agent-loop] ${pending.length} user message(s) received, continuing`);
+        for (const msg of pending) {
+          messages.push({ role: "user", content: msg });
+        }
+        continue;
+      }
+
+      // Wait briefly for any incoming messages before finalizing
+      await new Promise((r) => setTimeout(r, 500));
+      const lastCheck = getPendingMessages();
+      if (lastCheck.length > 0) {
+        console.log(`[agent-loop] late user message(s) received, continuing`);
+        for (const msg of lastCheck) {
+          messages.push({ role: "user", content: msg });
+        }
+        continue;
+      }
+
       console.log(`[agent-loop] session ${sessionId} completed`);
       wsClient.sendEvent(sessionId, "session_completed", {
         message: "Agent completed the task",
