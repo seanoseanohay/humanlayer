@@ -282,34 +282,40 @@ See `docs/evaluation.md` for detailed scenarios and success criteria.
 
 ## Development Process / AI Usage
 
-This project may be implemented with AI assistance, but the coding agent itself must remain a custom implementation and must not depend on the SDK, binary, or source code of an existing prebuilt coding agent.
+This project was built with **Claude Code** (Anthropic's CLI coding agent). The implementation process:
 
-When AI tools are used, the repository should include:
-- the configuration directory used by that tool, if applicable
-- any `AGENTS.md`, `CLAUDE.md`, or similar instruction files
-- a brief note about process and methodology
+1. **Planning phase** — wrote AGENTS.md and docs/ specs defining architecture, constraints, and phases before writing code
+2. **Incremental implementation** — built the system in small vertical slices with one commit per logical change (30+ commits in the history)
+3. **Phase-by-phase execution** — scaffold → DB/API → agent protocol → UI → stop control → hardening
+4. **Continuous verification** — typechecked and Docker-built after each phase to catch issues early
+
+The coding agent itself is a **custom implementation** using only the OpenAI SDK for LLM API calls. It does not use any prebuilt coding agent SDKs.
+
+Included configuration files:
+- `AGENTS.md` — architecture and coding standards
+- `CLAUDE.md` — project context for Claude Code
 
 ## Demo Video
 
-The final submission should include a Loom or other web-viewable demo link here:
+- `Demo video:` *(add final link before submission)*
 
-- `Demo video:` add final link before submission
-
-## Current Documentation
-Project specs live in:
-- `docs/requirements.md`
-- `docs/scope.md`
-- `docs/phases.md`
-- `docs/architecture.md`
-- `docs/decisions.md`
-- `docs/system-map.md`
-- `docs/constraints.md`
-- `docs/evaluation.md`
+## Documentation
+- `docs/requirements.md` — functional requirements and constraints
+- `docs/scope.md` — scope boundaries and priorities
+- `docs/phases.md` — implementation phases
+- `docs/architecture.md` — system architecture
+- `docs/decisions.md` — key design decisions
+- `docs/system-map.md` — system entry points and modules
+- `docs/constraints.md` — infrastructure constraints
+- `docs/evaluation.md` — test scenarios and success criteria
 
 ## Status
-This repository is structured as an execution-ready spec and implementation scaffold target for the HumanLayer assessment. The next implementation milestone is Phase 0 scaffold followed by vertical slices for:
-1. persistence and session API
-2. agent registration and assignment
-3. live event sync
-4. stop control
-5. end-to-end Docker validation
+
+All core features are implemented and verified:
+- Session create/list/detail/stop API
+- Agent registration, session assignment, and LLM execution loop
+- Live event streaming (SSE) with reconnect/replay
+- Cooperative stop with abort support
+- Agent disconnect handling
+- Event idempotency
+- Docker Compose boots all 4 containers from `.env` + `docker compose up`
