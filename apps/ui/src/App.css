@@ -162,3 +162,166 @@
   background: #7f1d1d;
   color: #fca5a5;
 }
+
+/* Session detail */
+.detail-header {
+  margin-bottom: 16px;
+}
+
+.back-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.detail-title h1 {
+  margin: 0;
+}
+
+.connection-dot {
+  font-size: 12px;
+  color: #888;
+}
+
+.connection-dot.connected {
+  color: #6ee7b7;
+}
+
+.connection-dot.connected::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6ee7b7;
+  margin-right: 4px;
+}
+
+.detail-prompt {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.stop-button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.stop-button:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.stop-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Events */
+.events-container h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px;
+  background: #111;
+}
+
+.event-item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.event-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.event-seq {
+  color: #666;
+  font-size: 11px;
+  min-width: 24px;
+}
+
+.event-type {
+  color: #888;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.event-time {
+  color: #555;
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.event-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.event-assistant_message_delta,
+.event-assistant_message_completed {
+  background: #0a1628;
+}
+
+.event-thinking_delta {
+  background: #1a1a0a;
+}
+
+.event-tool_call_started {
+  background: #0a1a0a;
+}
+
+.event-tool_call_output {
+  background: #111;
+}
+
+.event-error {
+  background: #1a0a0a;
+}
+
+.event-status_changed {
+  background: #1a1a2a;
+}
+
+.event-session_completed,
+.event-session_stopped {
+  background: #0a1a1a;
+}
