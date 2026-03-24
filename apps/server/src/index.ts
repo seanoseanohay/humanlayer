@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { migrateDatabase } from "./db/migrate.js";
+import { sessionRoutes } from "./routes/sessions.js";
 
 const port = parseInt(process.env["PORT"] ?? "3000", 10);
 const host = process.env["HOST"] ?? "0.0.0.0";
@@ -8,6 +9,7 @@ const host = process.env["HOST"] ?? "0.0.0.0";
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
+await app.register(sessionRoutes);
 
 app.get("/health", async () => {
   return { status: "ok" };

@@ -17,7 +17,8 @@
     "@humanlayer/shared": "*",
     "drizzle-orm": "^0.45.1",
     "fastify": "^5.2.1",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
