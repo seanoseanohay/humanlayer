@@ -62,7 +62,14 @@ export function SessionList() {
         </button>
       </form>
 
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <div className="error">
+          {error}
+          <button className="error-dismiss" onClick={() => { setError(null); fetchSessions(); }}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="session-list">
         {initialLoading ? (

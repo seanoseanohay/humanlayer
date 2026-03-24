@@ -69,6 +69,25 @@
   border-radius: 6px;
   margin-bottom: 16px;
   font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-dismiss {
+  background: #991b1b;
+  color: #fca5a5;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.error-dismiss:hover {
+  background: #b91c1c;
 }
 
 /* Session list */
