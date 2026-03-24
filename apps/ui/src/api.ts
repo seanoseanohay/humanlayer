@@ -51,6 +51,15 @@ export async function stopSession(id: string): Promise<Session> {
   return data.session;
 }
 
+export async function sendMessage(sessionId: string, content: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`Failed to send message: ${res.status}`);
+}
+
 export function createEventSource(sessionId: string, lastEventId?: number): EventSource {
   const url = new URL(`${API_BASE}/sessions/${sessionId}/events/stream`);
   const es = new EventSource(url.toString());

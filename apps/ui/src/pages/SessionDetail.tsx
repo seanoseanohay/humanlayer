@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getSession, stopSession, type Session } from "../api";
+import { getSession, stopSession, sendMessage, type Session } from "../api";
 import { useSessionEvents } from "../hooks/useSessionEvents";
 
 const TERMINAL_STATUSES = ["stopped", "completed", "failed"];
@@ -10,6 +10,8 @@ export function SessionDetail() {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
   const { events, connected } = useSessionEvents(id!);
   const eventsEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +60,20 @@ export function SessionDetail() {
   useEffect(() => {
     eventsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [events]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !messageText.trim()) return;
+    setSending(true);
+    try {
+      await sendMessage(id, messageText.trim());
+      setMessageText("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleStop = async () => {
     if (!id) return;
@@ -133,6 +149,21 @@ export function SessionDetail() {
           <div ref={eventsEndRef} />
         </div>
       </div>
+
+      {!isTerminal && (
+        <form onSubmit={handleSendMessage} className="message-form">
+          <input
+            type="text"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            placeholder="Send a follow-up message..."
+            disabled={sending}
+          />
+          <button type="submit" disabled={sending || !messageText.trim()}>
+            {sending ? "Sending..." : "Send"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -184,6 +215,9 @@ function EventItem({
       break;
     case "session_stopped":
       content = String(payload["reason"] ?? "Stopped");
+      break;
+    case "user_message":
+      content = String(payload["content"] ?? "");
       break;
     default:
       content = JSON.stringify(payload);
