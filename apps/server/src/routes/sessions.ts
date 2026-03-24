@@ -4,7 +4,7 @@ import { db, schema } from "../db/index.js";
 import { createSessionSchema, sessionIdParamSchema, sendMessageSchema } from "../validation.js";
 import type { SessionStatus } from "@humanlayer/shared";
 import { getAvailableAgent, sendToAgent } from "../ws/gateway.js";
-import { eventBus } from "../events/bus.js";
+import { insertSessionEvent } from "../db/helpers.js";
 
 const TERMINAL_STATUSES: SessionStatus[] = ["stopped", "completed", "failed"];
 
@@ -120,30 +120,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       .where(eq(schema.sessions.id, parsed.data.id))
       .returning();
 
-    // Persist status_changed event
-    const existingCount = await db
-      .select({ sequence: schema.sessionEvents.sequence })
-      .from(schema.sessionEvents)
-      .where(eq(schema.sessionEvents.sessionId, parsed.data.id))
-      .then((rows) => rows.length);
-
-    const [stoppingEvent] = await db
-      .insert(schema.sessionEvents)
-      .values({
-        sessionId: parsed.data.id,
-        sequence: existingCount + 1,
-        type: "status_changed",
-        payload: { status: newStatus, previousStatus: session.status },
-      })
-      .returning();
-
-    // Fan out to SSE clients immediately
-    eventBus.emitSessionEvent(parsed.data.id, {
-      id: stoppingEvent.id,
-      sequence: stoppingEvent.sequence,
-      timestamp: stoppingEvent.timestamp.toISOString(),
-      type: stoppingEvent.type,
-      payload: stoppingEvent.payload as Record<string, unknown>,
+    // Persist and fan out status_changed event
+    await insertSessionEvent(parsed.data.id, "status_changed", {
+      status: newStatus,
+      previousStatus: session.status,
     });
 
     // Notify the agent to stop
@@ -196,38 +176,33 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.sessions.id, sessionId));
     }
 
-    // Persist user_message event
-    const existingCount = await db
-      .select({ sequence: schema.sessionEvents.sequence })
-      .from(schema.sessionEvents)
-      .where(eq(schema.sessionEvents.sessionId, sessionId))
-      .then((rows) => rows.length);
-
-    const [event] = await db
-      .insert(schema.sessionEvents)
-      .values({
-        sessionId,
-        sequence: existingCount + 1,
-        type: "user_message",
-        payload: { content: bodyParsed.data.content },
-      })
-      .returning();
-
-    // Fan out to SSE
-    eventBus.emitSessionEvent(sessionId, {
-      id: event.id,
-      sequence: event.sequence,
-      timestamp: event.timestamp.toISOString(),
-      type: event.type,
-      payload: event.payload as Record<string, unknown>,
+    // Persist user_message event (atomic sequence via helper)
+    const event = await insertSessionEvent(sessionId, "user_message", {
+      content: bodyParsed.data.content,
     });
 
-    // Forward to agent via WS
+    // Forward to agent via WS — try current agent, then any available
+    let sent = false;
     if (session.agentId) {
-      sendToAgent(session.agentId, {
+      sent = sendToAgent(session.agentId, {
         type: "server:user_message",
         payload: { sessionId, content: bodyParsed.data.content },
       });
+    }
+    if (!sent) {
+      const agent = getAvailableAgent();
+      if (agent) {
+        // Update session's agent ID
+        await db
+          .update(schema.sessions)
+          .set({ agentId: agent.agentId, updatedAt: new Date() })
+          .where(eq(schema.sessions.id, sessionId));
+
+        sendToAgent(agent.agentId, {
+          type: "server:user_message",
+          payload: { sessionId, content: bodyParsed.data.content },
+        });
+      }
     }
 
     return reply.status(201).send({ event });

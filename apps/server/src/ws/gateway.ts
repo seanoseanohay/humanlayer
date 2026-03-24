@@ -1,8 +1,9 @@
 import { FastifyInstance } from "fastify";
 import websocket from "@fastify/websocket";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { eventBus } from "../events/bus.js";
+import { insertSessionEvent } from "../db/helpers.js";
 import type {
   AgentToServerMessage,
   ServerToAgentMessage,
@@ -128,36 +129,11 @@ export async function wsGateway(app: FastifyInstance): Promise<void> {
         case "agent:event": {
           if (!agentId) return;
           const { sessionId, event } = msg.payload;
-
-          // Get next sequence number
-          const existing = await db
-            .select({ sequence: schema.sessionEvents.sequence })
-            .from(schema.sessionEvents)
-            .where(eq(schema.sessionEvents.sessionId, sessionId))
-            .orderBy(schema.sessionEvents.sequence)
-            .then((rows) => rows.length);
-
-          const nextSeq = existing + 1;
-
-          // Persist the event
-          const [persisted] = await db
-            .insert(schema.sessionEvents)
-            .values({
-              sessionId,
-              sequence: nextSeq,
-              type: event.type as typeof schema.sessionEvents.$inferInsert.type,
-              payload: event.payload,
-            })
-            .returning();
-
-          // Fan out to SSE clients
-          eventBus.emitSessionEvent(sessionId, {
-            id: persisted.id,
-            sequence: persisted.sequence,
-            timestamp: persisted.timestamp.toISOString(),
-            type: persisted.type,
-            payload: persisted.payload as Record<string, unknown>,
-          });
+          await insertSessionEvent(
+            sessionId,
+            event.type as typeof schema.sessionEvents.$inferInsert.type,
+            event.payload,
+          );
           break;
         }
 
@@ -173,30 +149,7 @@ export async function wsGateway(app: FastifyInstance): Promise<void> {
             })
             .where(eq(schema.sessions.id, sessionId));
 
-          // Persist status change event
-          const existing = await db
-            .select({ sequence: schema.sessionEvents.sequence })
-            .from(schema.sessionEvents)
-            .where(eq(schema.sessionEvents.sessionId, sessionId))
-            .then((rows) => rows.length);
-
-          const [persisted] = await db
-            .insert(schema.sessionEvents)
-            .values({
-              sessionId,
-              sequence: existing + 1,
-              type: "status_changed",
-              payload: { status },
-            })
-            .returning();
-
-          eventBus.emitSessionEvent(sessionId, {
-            id: persisted.id,
-            sequence: persisted.sequence,
-            timestamp: persisted.timestamp.toISOString(),
-            type: persisted.type,
-            payload: persisted.payload as Record<string, unknown>,
-          });
+          await insertSessionEvent(sessionId, "status_changed", { status });
           break;
         }
       }
@@ -233,48 +186,12 @@ export async function wsGateway(app: FastifyInstance): Promise<void> {
             .set({ status: "failed", updatedAt: new Date() })
             .where(eq(schema.sessions.id, session.id));
 
-          // Persist disconnect error event
-          const count = await db
-            .select({ sequence: schema.sessionEvents.sequence })
-            .from(schema.sessionEvents)
-            .where(eq(schema.sessionEvents.sessionId, session.id))
-            .then((rows) => rows.length);
-
-          const [evt] = await db
-            .insert(schema.sessionEvents)
-            .values({
-              sessionId: session.id,
-              sequence: count + 1,
-              type: "error",
-              payload: { message: "Agent disconnected unexpectedly" },
-            })
-            .returning();
-
-          eventBus.emitSessionEvent(session.id, {
-            id: evt.id,
-            sequence: evt.sequence,
-            timestamp: evt.timestamp.toISOString(),
-            type: evt.type,
-            payload: evt.payload as Record<string, unknown>,
+          await insertSessionEvent(session.id, "error", {
+            message: "Agent disconnected unexpectedly",
           });
-
-          // Also emit status_changed
-          const [statusEvt] = await db
-            .insert(schema.sessionEvents)
-            .values({
-              sessionId: session.id,
-              sequence: count + 2,
-              type: "status_changed",
-              payload: { status: "failed", reason: "agent_disconnected" },
-            })
-            .returning();
-
-          eventBus.emitSessionEvent(session.id, {
-            id: statusEvt.id,
-            sequence: statusEvt.sequence,
-            timestamp: statusEvt.timestamp.toISOString(),
-            type: statusEvt.type,
-            payload: statusEvt.payload as Record<string, unknown>,
+          await insertSessionEvent(session.id, "status_changed", {
+            status: "failed",
+            reason: "agent_disconnected",
           });
         }
       }
