@@ -4,6 +4,7 @@ import { db, schema } from "../db/index.js";
 import { createSessionSchema, sessionIdParamSchema } from "../validation.js";
 import type { SessionStatus } from "@humanlayer/shared";
 import { getAvailableAgent, sendToAgent } from "../ws/gateway.js";
+import { eventBus } from "../events/bus.js";
 
 const TERMINAL_STATUSES: SessionStatus[] = ["stopped", "completed", "failed"];
 
@@ -105,11 +106,45 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    // Idempotent — if already stopping, return current state
+    if (session.status === "stopping") {
+      return reply.send({ session });
+    }
+
+    // If session is still queued (no agent), go directly to stopped
+    const newStatus = session.status === "queued" ? "stopped" : "stopping";
+
     const [updated] = await db
       .update(schema.sessions)
-      .set({ status: "stopping", updatedAt: new Date() })
+      .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(schema.sessions.id, parsed.data.id))
       .returning();
+
+    // Persist status_changed event
+    const existingCount = await db
+      .select({ sequence: schema.sessionEvents.sequence })
+      .from(schema.sessionEvents)
+      .where(eq(schema.sessionEvents.sessionId, parsed.data.id))
+      .then((rows) => rows.length);
+
+    const [stoppingEvent] = await db
+      .insert(schema.sessionEvents)
+      .values({
+        sessionId: parsed.data.id,
+        sequence: existingCount + 1,
+        type: "status_changed",
+        payload: { status: newStatus, previousStatus: session.status },
+      })
+      .returning();
+
+    // Fan out to SSE clients immediately
+    eventBus.emitSessionEvent(parsed.data.id, {
+      id: stoppingEvent.id,
+      sequence: stoppingEvent.sequence,
+      timestamp: stoppingEvent.timestamp.toISOString(),
+      type: stoppingEvent.type,
+      payload: stoppingEvent.payload as Record<string, unknown>,
+    });
 
     // Notify the agent to stop
     if (session.agentId) {
