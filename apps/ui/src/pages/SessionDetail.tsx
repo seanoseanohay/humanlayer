@@ -22,18 +22,34 @@ export function SessionDetail() {
       );
   }, [id]);
 
-  // Update session status from status_changed events
+  // Update session status from events (status_changed, terminal events)
   useEffect(() => {
+    if (!session) return;
+
+    // Check status_changed events
     const statusEvent = [...events]
       .reverse()
       .find((e) => e.type === "status_changed");
-    if (statusEvent && session) {
+    if (statusEvent) {
       const newStatus = (statusEvent.payload as { status?: string }).status;
       if (newStatus && newStatus !== session.status) {
-        setSession({ ...session, status: newStatus });
+        setSession((prev) => prev ? { ...prev, status: newStatus } : prev);
+        if (stopping && ["stopped", "completed", "failed"].includes(newStatus)) {
+          setStopping(false);
+        }
       }
     }
-  }, [events, session]);
+
+    // Also handle terminal events directly
+    const lastEvent = events[events.length - 1];
+    if (lastEvent?.type === "session_completed" && session.status !== "completed") {
+      setSession((prev) => prev ? { ...prev, status: "completed" } : prev);
+    }
+    if (lastEvent?.type === "session_stopped" && session.status !== "stopped") {
+      setSession((prev) => prev ? { ...prev, status: "stopped" } : prev);
+      setStopping(false);
+    }
+  }, [events, session, stopping]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -67,7 +83,8 @@ export function SessionDetail() {
   }
 
   const isTerminal = TERMINAL_STATUSES.includes(session.status);
-  const canStop = !isTerminal && session.status !== "stopping";
+  const isStopping = session.status === "stopping" || stopping;
+  const showStopButton = !isTerminal;
 
   return (
     <div className="page">
@@ -90,13 +107,13 @@ export function SessionDetail() {
         <strong>Prompt:</strong> {session.prompt}
       </div>
 
-      {canStop && (
+      {showStopButton && (
         <button
           className="stop-button"
           onClick={handleStop}
-          disabled={stopping}
+          disabled={isStopping}
         >
-          {stopping ? "Stopping..." : "Stop Session"}
+          {isStopping ? "Stopping..." : "Stop Session"}
         </button>
       )}
 
