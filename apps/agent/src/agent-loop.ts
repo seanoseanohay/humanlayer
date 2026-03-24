@@ -20,6 +20,12 @@ export interface AgentLoopOptions {
   shouldStop: () => boolean;
 }
 
+function emitStop(wsClient: AgentWSClient, sessionId: string, reason: string): void {
+  console.log(`[agent-loop] stopping session ${sessionId}: ${reason}`);
+  wsClient.sendEvent(sessionId, "session_stopped", { reason });
+  wsClient.sendSessionUpdate(sessionId, "stopped");
+}
+
 export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
   const { sessionId, prompt, wsClient, shouldStop } = opts;
 
@@ -30,10 +36,6 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
     client = new OpenAI({
       apiKey: process.env["ANTHROPIC_API_KEY"],
       baseURL: "https://api.anthropic.com/v1/",
-    });
-  } else if (provider === "openai") {
-    client = new OpenAI({
-      apiKey: process.env["OPENAI_API_KEY"],
     });
   } else {
     client = new OpenAI({
@@ -54,35 +56,60 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
   const MAX_ITERATIONS = 20;
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    // Check for stop signal
+    // Check before LLM call
     if (shouldStop()) {
-      console.log(`[agent-loop] stop signal received for session ${sessionId}`);
-      wsClient.sendEvent(sessionId, "session_stopped", {
-        reason: "User requested stop",
-      });
-      wsClient.sendSessionUpdate(sessionId, "stopped");
+      emitStop(wsClient, sessionId, "User requested stop");
       return;
     }
 
-    // Send thinking event
     wsClient.sendEvent(sessionId, "thinking_delta", {
       content: `Step ${i + 1}: Calling LLM...`,
     });
 
+    // Use AbortController so we can cancel in-flight requests on stop
+    const abortController = new AbortController();
+    let stopCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+    // Poll for stop signal during LLM call (every 500ms)
+    stopCheckTimer = setInterval(() => {
+      if (shouldStop()) {
+        abortController.abort();
+      }
+    }, 500);
+
     let response: OpenAI.Chat.Completions.ChatCompletion;
     try {
-      response = await client.chat.completions.create({
-        model,
-        messages,
-        tools: TOOL_DEFINITIONS,
-        tool_choice: "auto",
-      });
+      response = await client.chat.completions.create(
+        {
+          model,
+          messages,
+          tools: TOOL_DEFINITIONS,
+          tool_choice: "auto",
+        },
+        { signal: abortController.signal }
+      );
     } catch (err) {
+      if (stopCheckTimer) clearInterval(stopCheckTimer);
+
+      // Check if this was a stop-induced abort
+      if (shouldStop()) {
+        emitStop(wsClient, sessionId, "User requested stop during LLM call");
+        return;
+      }
+
       console.error(`[agent-loop] LLM error:`, err);
       wsClient.sendEvent(sessionId, "error", {
         message: `LLM API error: ${err instanceof Error ? err.message : String(err)}`,
       });
       wsClient.sendSessionUpdate(sessionId, "failed");
+      return;
+    } finally {
+      if (stopCheckTimer) clearInterval(stopCheckTimer);
+    }
+
+    // Check after LLM call returns
+    if (shouldStop()) {
+      emitStop(wsClient, sessionId, "User requested stop after LLM response");
       return;
     }
 
@@ -109,15 +136,12 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
     // Handle tool calls
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
       for (const toolCall of assistantMessage.tool_calls) {
+        // Check before each tool execution
         if (shouldStop()) {
-          wsClient.sendEvent(sessionId, "session_stopped", {
-            reason: "User requested stop",
-          });
-          wsClient.sendSessionUpdate(sessionId, "stopped");
+          emitStop(wsClient, sessionId, "User requested stop before tool execution");
           return;
         }
 
-        // Only handle function-type tool calls
         if (toolCall.type !== "function") continue;
 
         const fnName = toolCall.function.name;
@@ -149,7 +173,6 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
           name: fnName,
         });
 
-        // Add tool result to conversation
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
@@ -157,9 +180,14 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
             ? `Error: ${result.error}\n${result.output}`
             : result.output,
         });
+
+        // Check after each tool execution
+        if (shouldStop()) {
+          emitStop(wsClient, sessionId, "User requested stop after tool execution");
+          return;
+        }
       }
 
-      // Continue the loop to let the LLM process tool results
       continue;
     }
 
