@@ -190,9 +190,12 @@ function EventItem({
     case "thinking_delta":
       content = String(payload["content"] ?? "");
       break;
-    case "tool_call_started":
-      content = `${payload["name"]}(${JSON.stringify(payload["arguments"] ?? {})})`;
+    case "tool_call_started": {
+      const args = payload["arguments"] as Record<string, unknown> | undefined;
+      const formattedArgs = args ? JSON.stringify(args, null, 2) : "{}";
+      content = `${payload["name"]}(${formattedArgs})`;
       break;
+    }
     case "tool_call_output": {
       const output = String(payload["output"] ?? "");
       const err = payload["error"] ? `Error: ${payload["error"]}` : "";

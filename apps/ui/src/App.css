@@ -370,10 +370,20 @@
 
 .event-tool_call_started {
   background: #0a1a0a;
+  border-left: 3px solid #22c55e;
+}
+
+.event-tool_call_started .event-content {
+  color: #86efac;
 }
 
 .event-tool_call_output {
   background: #111;
+  border-left: 3px solid #444;
+}
+
+.event-tool_call_completed {
+  border-left: 3px solid #22c55e;
 }
 
 .event-error {
