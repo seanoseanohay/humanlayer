@@ -316,6 +316,36 @@
   color: #ccc;
 }
 
+.event-markdown {
+  white-space: normal;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+.event-markdown p {
+  margin: 4px 0;
+}
+
+.event-markdown code {
+  background: #1e1e2e;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.event-markdown pre {
+  background: #1e1e2e;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.event-markdown pre code {
+  background: none;
+  padding: 0;
+}
+
 .expand-toggle {
   background: none;
   border: none;

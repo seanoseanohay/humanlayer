@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getSession, stopSession, sendMessage, type Session } from "../api";
 import { useSessionEvents } from "../hooks/useSessionEvents";
+import Markdown from "react-markdown";
 
 const TERMINAL_STATUSES = ["stopped", "completed", "failed"];
 
@@ -236,7 +237,15 @@ function EventItem({
           {new Date(event.timestamp).toLocaleTimeString()}
         </span>
       </div>
-      <pre className="event-content">{displayContent}</pre>
+      {event.type === "assistant_message_delta" ||
+      event.type === "assistant_message_completed" ||
+      event.type === "user_message" ? (
+        <div className="event-content event-markdown">
+          <Markdown>{displayContent}</Markdown>
+        </div>
+      ) : (
+        <pre className="event-content">{displayContent}</pre>
+      )}
       {isLong && (
         <button
           className="expand-toggle"
