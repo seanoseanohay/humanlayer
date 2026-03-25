@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listSessions, createSession, type Session } from "../api";
-import { timeAgo } from "../utils/time";
+import { timeAgo, duration } from "../utils/time";
 
 export function SessionList() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -88,8 +88,15 @@ export function SessionList() {
                 <span className={`status status-${session.status}`}>
                   {session.status}
                 </span>
-                <span className="session-time">
-                  {timeAgo(session.createdAt)}
+                <span className="session-meta">
+                  {session.createdAt !== session.updatedAt && (
+                    <span className="session-duration">
+                      {duration(session.createdAt, session.updatedAt)}
+                    </span>
+                  )}
+                  <span className="session-time">
+                    {timeAgo(session.createdAt)}
+                  </span>
                 </span>
               </div>
               <p className="session-prompt">{session.prompt}</p>

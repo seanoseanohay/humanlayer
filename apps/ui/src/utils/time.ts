@@ -13,3 +13,18 @@ export function timeAgo(dateStr: string): string {
   if (days < 7) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString();
 }
+
+export function duration(startStr: string, endStr: string): string {
+  const start = new Date(startStr).getTime();
+  const end = new Date(endStr).getTime();
+  const seconds = Math.floor((end - start) / 1000);
+
+  if (seconds < 1) return "<1s";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${secs}s`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+}
