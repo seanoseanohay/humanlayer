@@ -229,13 +229,33 @@ function EventItem({
 
   const isLong = content.length > 300;
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const displayContent = isLong && !expanded ? content.slice(0, 300) + "..." : content;
+
+  const showCopy =
+    event.type === "tool_call_output" ||
+    event.type === "tool_call_started" ||
+    event.type === "assistant_message_completed" ||
+    event.type === "assistant_message_delta";
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <div className={`event-item event-${event.type}`}>
       <div className="event-meta">
         <span className="event-seq">#{event.sequence}</span>
         <span className="event-type">{event.type}</span>
+        <span className="event-actions">
+          {showCopy && (
+            <button className="copy-btn" onClick={handleCopy}>
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          )}
+        </span>
         <span className="event-time">
           {new Date(event.timestamp).toLocaleTimeString()}
         </span>
