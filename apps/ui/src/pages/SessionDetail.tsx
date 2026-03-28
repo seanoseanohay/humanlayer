@@ -251,7 +251,24 @@ function EventItem({
     event.type === "assistant_message_completed" ||
     event.type === "assistant_message_delta";
 
-  const showDownload = event.type === "file_created";
+  // Show download on file_created events AND on write_file tool calls
+  const isWriteFileTool =
+    (event.type === "tool_call_started" || event.type === "tool_call_completed") &&
+    payload["name"] === "write_file";
+  const showDownload = event.type === "file_created" || isWriteFileTool;
+
+  // Extract the file path for the download link
+  let downloadPath: string | null = null;
+  if (event.type === "file_created") {
+    downloadPath = String(payload["path"] ?? "");
+  } else if (isWriteFileTool && event.type === "tool_call_started") {
+    const args = payload["arguments"] as Record<string, string> | undefined;
+    downloadPath = args?.["path"] ?? null;
+  } else if (isWriteFileTool && event.type === "tool_call_completed") {
+    // tool_call_completed doesn't have the path — we'd need to look it up
+    // Skip download on completed for now, the started event has it
+    downloadPath = null;
+  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -265,10 +282,10 @@ function EventItem({
         <span className="event-seq">#{event.sequence}</span>
         <span className="event-type">{event.type}</span>
         <span className="event-actions">
-          {showDownload && (
+          {showDownload && downloadPath && (
             <a
               className="download-btn"
-              href={`${API_BASE}/sessions/${event.sessionId}/files/${payload["path"]}`}
+              href={`${API_BASE}/sessions/${event.sessionId}/files/${downloadPath}`}
               download
             >
               Download
