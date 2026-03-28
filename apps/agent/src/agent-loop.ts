@@ -30,19 +30,12 @@ function emitStop(wsClient: AgentWSClient, sessionId: string, reason: string): v
 export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
   const { sessionId, prompt, wsClient, shouldStop, getPendingMessages } = opts;
 
-  const provider = process.env["LLM_PROVIDER"] ?? "openai";
-  let client: OpenAI;
-
-  if (provider === "anthropic") {
-    client = new OpenAI({
-      apiKey: process.env["ANTHROPIC_API_KEY"],
-      baseURL: "https://api.anthropic.com/v1/",
-    });
-  } else {
-    client = new OpenAI({
-      apiKey: process.env["OPENAI_API_KEY"],
-    });
-  }
+  // Supports any OpenAI-compatible API. Set OPENAI_BASE_URL for
+  // alternative providers (e.g. local models via llama.cpp).
+  const client = new OpenAI({
+    apiKey: process.env["OPENAI_API_KEY"],
+    baseURL: process.env["OPENAI_BASE_URL"] ?? undefined,
+  });
 
   const model = process.env["LLM_MODEL"] ?? "gpt-4o-mini";
 

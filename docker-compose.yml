@@ -44,10 +44,9 @@ services:
       SERVER_URL: ws://server:3000
       AGENT_SHARED_SECRET: ${AGENT_SHARED_SECRET:-dev-secret}
       AGENT_NAME: agent-docker
-      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
     volumes:
       - ./workspace:/workspace
     depends_on:

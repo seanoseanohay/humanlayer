@@ -38,10 +38,9 @@ The system is designed to satisfy the HumanLayer take-home constraints:
 
 ### Runtime Shape
 The review/demo deployment runs with Docker Compose:
-- `server`
-- `ui`
-- `db`
-- `agent-runner`
+- `db` — Postgres
+- `server` — API + UI served on one port
+- `agent-runner` — headless coding agent (no exposed ports)
 
 The architecture remains **remote-capable**: the agent protocol is designed so the daemon can also run outside Compose later as long as it can connect outbound to the server.
 
@@ -147,7 +146,10 @@ The server is the source of truth for ordering and replay.
 ```text
 .
 ├── AGENTS.md
+├── CLAUDE.md
 ├── README.md
+├── docker-compose.yml
+├── .env.example
 ├── docs/
 │   ├── requirements.md
 │   ├── scope.md
@@ -158,12 +160,16 @@ The server is the source of truth for ordering and replay.
 │   ├── constraints.md
 │   └── evaluation.md
 ├── apps/
-│   ├── server/
-│   ├── ui/
-│   └── agent/
+│   ├── server/       # API + UI serving + WS gateway
+│   ├── ui/           # React SPA (built into server image)
+│   └── agent/        # Headless coding agent daemon
 ├── packages/
-│   └── shared/
-└── infra/
+│   └── shared/       # Shared TypeScript types and protocol
+├── infra/
+│   ├── server.Dockerfile
+│   ├── agent.Dockerfile
+│   └── db/init.sql
+└── workspace/        # Agent execution directory (mounted volume)
 ```
 
 ## Getting Started
@@ -181,7 +187,7 @@ cp .env.example .env
 # Edit .env and set OPENAI_API_KEY (or ANTHROPIC_API_KEY)
 ```
 
-The default provider is `openai` with model `gpt-4o-mini`. Set `LLM_PROVIDER=anthropic` to use Anthropic instead.
+The agent uses the OpenAI SDK and works with any OpenAI-compatible API. Default model is `gpt-4o-mini`. Set `OPENAI_BASE_URL` for alternative providers (e.g. local models via llama.cpp).
 
 ### Start the stack
 ```bash
@@ -226,12 +232,13 @@ Rules:
 ## API / Transport Outline
 
 ### UI → Server
-HTTP endpoints such as:
-- `POST /sessions`
-- `POST /sessions/:id/stop`
-- `GET /sessions`
-- `GET /sessions/:id`
-- `GET /sessions/:id/events` or SSE stream endpoint
+HTTP endpoints:
+- `POST /sessions` — create a session
+- `GET /sessions` — list all sessions
+- `GET /sessions/:id` — get session with events
+- `POST /sessions/:id/stop` — request cooperative stop
+- `POST /sessions/:id/message` — send follow-up message
+- `GET /sessions/:id/events/stream` — SSE event stream
 
 ### Server → UI
 SSE stream for:
@@ -266,7 +273,7 @@ See `docs/evaluation.md` for detailed scenarios and success criteria.
 This project was built with **Claude Code** (Anthropic's CLI coding agent). The implementation process:
 
 1. **Planning phase** — wrote AGENTS.md and docs/ specs defining architecture, constraints, and phases before writing code
-2. **Incremental implementation** — built the system in small vertical slices with one commit per logical change (30+ commits in the history)
+2. **Incremental implementation** — built the system in small vertical slices with one commit per logical change (55+ commits in the history)
 3. **Phase-by-phase execution** — scaffold → DB/API → agent protocol → UI → stop control → hardening
 4. **Continuous verification** — typechecked and Docker-built after each phase to catch issues early
 
@@ -299,4 +306,4 @@ All core features are implemented and verified:
 - Cooperative stop with abort support
 - Agent disconnect handling
 - Event idempotency
-- Docker Compose boots all 4 containers from `.env` + `docker compose up`
+- Docker Compose boots all 3 containers from `.env` + `docker compose up`
