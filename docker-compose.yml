@@ -23,6 +23,8 @@ services:
       dockerfile: infra/server.Dockerfile
     ports:
       - "${SERVER_PORT:-3000}:3000"
+    volumes:
+      - ./workspace:/workspace:ro
     environment:
       PORT: "3000"
       DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-humanlayer}

@@ -1,4 +1,6 @@
 import { FastifyInstance } from "fastify";
+import { resolve, basename } from "node:path";
+import { existsSync, createReadStream } from "node:fs";
 import { eq, desc } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { createSessionSchema, sessionIdParamSchema, sendMessageSchema } from "../validation.js";
@@ -7,6 +9,16 @@ import { getAvailableAgent, sendToAgent } from "../ws/gateway.js";
 import { insertSessionEvent } from "../db/helpers.js";
 
 const TERMINAL_STATUSES: SessionStatus[] = ["stopped", "completed", "failed"];
+
+const WORKSPACE = process.env["WORKSPACE_DIR"] ?? "/workspace";
+
+function resolveWorkspacePath(filePath: string): string {
+  const resolved = resolve(WORKSPACE, filePath);
+  if (!resolved.startsWith(WORKSPACE + "/") && resolved !== WORKSPACE) {
+    throw new Error(`Path escapes workspace: ${filePath}`);
+  }
+  return resolved;
+}
 
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   // POST /sessions — create a new session
@@ -206,5 +218,45 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.status(201).send({ event });
+  });
+
+  // GET /sessions/:id/files/* — download a workspace file
+  app.get("/sessions/:id/files/*", async (request, reply) => {
+    const paramsParsed = sessionIdParamSchema.safeParse(request.params);
+    if (!paramsParsed.success) {
+      return reply.status(400).send({ error: paramsParsed.error.flatten() });
+    }
+
+    // Verify session exists
+    const [session] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, paramsParsed.data.id));
+
+    if (!session) {
+      return reply.status(404).send({ error: "Session not found" });
+    }
+
+    // Extract the wildcard path
+    const wildcardPath = (request.params as Record<string, string>)["*"];
+    if (!wildcardPath) {
+      return reply.status(400).send({ error: "File path is required" });
+    }
+
+    // Resolve with traversal protection
+    let resolved: string;
+    try {
+      resolved = resolveWorkspacePath(wildcardPath);
+    } catch {
+      return reply.status(400).send({ error: "Invalid file path" });
+    }
+
+    if (!existsSync(resolved)) {
+      return reply.status(404).send({ error: "File not found" });
+    }
+
+    const filename = basename(resolved);
+    reply.header("Content-Disposition", `attachment; filename="${filename}"`);
+    return reply.send(createReadStream(resolved));
   });
 }

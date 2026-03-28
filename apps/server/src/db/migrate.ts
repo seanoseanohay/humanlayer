@@ -88,4 +88,12 @@ export async function migrateDatabase(): Promise<void> {
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$
   `);
+
+  // Add file_created to event_type enum if it doesn't exist
+  await db.execute(sql`
+    DO $$ BEGIN
+      ALTER TYPE event_type ADD VALUE IF NOT EXISTS 'file_created';
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$
+  `);
 }
