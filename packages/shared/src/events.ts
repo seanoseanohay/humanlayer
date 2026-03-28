@@ -9,6 +9,7 @@ export const EVENT_TYPES = [
   "tool_call_started",
   "tool_call_output",
   "tool_call_completed",
+  "file_created",
   "status_changed",
   "error",
   "session_stopped",

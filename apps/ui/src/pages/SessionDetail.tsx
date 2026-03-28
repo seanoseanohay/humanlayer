@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getSession, stopSession, sendMessage, type Session } from "../api";
+import { getSession, stopSession, sendMessage, type Session, API_BASE } from "../api";
 import { useSessionEvents } from "../hooks/useSessionEvents";
 import Markdown from "react-markdown";
 
@@ -169,10 +169,17 @@ export function SessionDetail() {
   );
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function EventItem({
   event,
 }: {
   event: {
+    sessionId: string;
     sequence: number;
     timestamp: string;
     type: string;
@@ -205,6 +212,12 @@ function EventItem({
     case "tool_call_completed":
       content = `${payload["name"]} done`;
       break;
+    case "file_created": {
+      const filePath = String(payload["path"] ?? "");
+      const fileSize = Number(payload["size"] ?? 0);
+      content = `File created: ${filePath} (${formatBytes(fileSize)})`;
+      break;
+    }
     case "status_changed":
       content = `Status: ${payload["status"]}`;
       break;
@@ -238,6 +251,8 @@ function EventItem({
     event.type === "assistant_message_completed" ||
     event.type === "assistant_message_delta";
 
+  const showDownload = event.type === "file_created";
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
     setCopied(true);
@@ -250,6 +265,15 @@ function EventItem({
         <span className="event-seq">#{event.sequence}</span>
         <span className="event-type">{event.type}</span>
         <span className="event-actions">
+          {showDownload && (
+            <a
+              className="download-btn"
+              href={`${API_BASE}/sessions/${event.sessionId}/files/${payload["path"]}`}
+              download
+            >
+              Download
+            </a>
+          )}
           {showCopy && (
             <button className="copy-btn" onClick={handleCopy}>
               {copied ? "Copied!" : "Copy"}

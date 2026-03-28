@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
 const WORKSPACE = process.env["WORKSPACE_DIR"] ?? "/workspace";
@@ -48,6 +48,10 @@ export interface ToolResult {
   error?: string;
 }
 
+export interface WriteFileResult extends ToolResult {
+  fileMeta?: { path: string; size: number };
+}
+
 export function readFile(path: string): ToolResult {
   try {
     const resolved = resolveWorkspacePath(path);
@@ -58,7 +62,7 @@ export function readFile(path: string): ToolResult {
   }
 }
 
-export function writeFile(path: string, content: string): ToolResult {
+export function writeFile(path: string, content: string): WriteFileResult {
   try {
     const resolved = resolveWorkspacePath(path);
     const dir = dirname(resolved);
@@ -66,7 +70,11 @@ export function writeFile(path: string, content: string): ToolResult {
       mkdirSync(dir, { recursive: true });
     }
     writeFileSync(resolved, content, "utf-8");
-    return { output: `Wrote ${content.length} bytes to ${path}` };
+    const stat = statSync(resolved);
+    return {
+      output: `Wrote ${stat.size} bytes to ${path}`,
+      fileMeta: { path, size: stat.size },
+    };
   } catch (err) {
     return { output: "", error: String(err) };
   }
@@ -189,8 +197,8 @@ function truncateOutput(output: string): string {
 export function executeTool(
   name: string,
   args: Record<string, string>
-): ToolResult {
-  let result: ToolResult;
+): ToolResult | WriteFileResult {
+  let result: ToolResult | WriteFileResult;
   try {
     switch (name) {
       case "read_file":
@@ -212,8 +220,12 @@ export function executeTool(
     return { output: "", error: `Tool execution error: ${err}` };
   }
 
-  return {
+  const truncated: ToolResult | WriteFileResult = {
     output: truncateOutput(result.output),
     error: result.error,
   };
+  if ("fileMeta" in result && result.fileMeta) {
+    (truncated as WriteFileResult).fileMeta = result.fileMeta;
+  }
+  return truncated;
 }

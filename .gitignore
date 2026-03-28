@@ -8,3 +8,6 @@ coverage/
 .turbo/
 workspace/*
 !workspace/.gitkeep
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/

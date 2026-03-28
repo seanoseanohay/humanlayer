@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { TOOL_DEFINITIONS, executeTool } from "./tools.js";
+import { TOOL_DEFINITIONS, executeTool, type WriteFileResult } from "./tools.js";
 import type { AgentWSClient } from "./ws-client.js";
 
 const SYSTEM_PROMPT = `You are a coding agent. You have access to a workspace directory where you can read, write, and execute files.
@@ -168,6 +168,16 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<void> {
           output: result.output,
           error: result.error,
         });
+
+        // Emit file_created event for write_file tool calls
+        if (fnName === "write_file" && "fileMeta" in result && result.fileMeta) {
+          const { path, size } = (result as WriteFileResult).fileMeta!;
+          wsClient.sendEvent(sessionId, "file_created", {
+            toolCallId: toolCall.id,
+            path,
+            size,
+          });
+        }
 
         wsClient.sendEvent(sessionId, "tool_call_completed", {
           toolCallId: toolCall.id,
